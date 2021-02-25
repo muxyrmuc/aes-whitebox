@@ -5,30 +5,24 @@
 #ifndef AES_WHITEBOX_H_
 #define AES_WHITEBOX_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <cstdint>
+#include <cstddef>
 
-#include <stdint.h>
-#include <stddef.h>
+class AESImpl;
 
-void aes_whitebox_encrypt_cfb(const uint8_t iv[16], const uint8_t* m,
-    size_t len, uint8_t* c);
-void aes_whitebox_decrypt_cfb(const uint8_t iv[16], const uint8_t* c,
-    size_t len, uint8_t* m);
+class AES {
+  AESImpl* impl_;
 
-void aes_whitebox_encrypt_ofb(const uint8_t iv[16], const uint8_t* m,
-    size_t len, uint8_t* c);
-void aes_whitebox_decrypt_ofb(const uint8_t iv[16], const uint8_t* c,
-    size_t len, uint8_t* m);
+public:
+  AES(int Nr,
+      const uint8_t Xor[13][96][16][16],
+      const uint32_t Tyboxes[13][16][256],
+      const uint8_t TboxesLast[16][256],
+      const uint32_t MBL[13][16][256]);
+  ~AES();
 
-void aes_whitebox_encrypt_ctr(const uint8_t nonce[16], const uint8_t* m,
-    size_t len, uint8_t* c);
-void aes_whitebox_decrypt_ctr(const uint8_t nonce[16], const uint8_t* c,
-    size_t len, uint8_t* m);
-
-#ifdef __cplusplus
-}
-#endif
+  bool EncodeCBC(const uint8_t iv[16], const uint8_t* m, size_t len, uint8_t* c);
+  bool DecodeCBC(const uint8_t iv[16], const uint8_t* c, size_t len, uint8_t* m);
+};
 
 #endif  // AES_WHITEBOX_H_

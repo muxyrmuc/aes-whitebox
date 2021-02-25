@@ -4,9 +4,14 @@
 
 #include "aes_whitebox.h"
 
-#include "aes_whitebox_tables.cc"
+#include <cstring>
 
-namespace {
+class AESImpl {
+  int Nr;
+  uint8_t Xor[13][96][16][16];
+  uint32_t Tyboxes[13][16][256];
+  uint8_t TboxesLast[16][256];
+  uint32_t MBL[13][16][256];
 
 void ShiftRows(uint8_t state[16]) {
   constexpr int shifts[16] = {
@@ -105,84 +110,45 @@ void Cipher(uint8_t in[16]) {
     in[i] = TboxesLast[i][in[i]];
 }
 
-}  // namespace
-
-extern "C" {
-
-void aes_whitebox_encrypt_cfb(const uint8_t iv[16], const uint8_t* m,
-    size_t len, uint8_t* c) {
-  uint8_t cfb_blk[16];
-
-  for (int i = 0; i < 16; i++)
-    cfb_blk[i] = iv[i];
-
-  for (size_t i = 0; i < len; i++) {
-    if ((i & 0xf) == 0)
-      Cipher(cfb_blk);
-    cfb_blk[i & 0xf] ^= m[i];
-    c[i] = cfb_blk[i & 0xf];
+public:
+  AESImpl(int _Nr,
+          const uint8_t _Xor[13][96][16][16],
+          const uint32_t _Tyboxes[13][16][256],
+          const uint8_t _TboxesLast[16][256],
+          const uint32_t _MBL[13][16][256])
+  : Nr(_Nr) {
+    std::memcpy(Xor, _Xor, 13 * 96 * 16 * 16);
+    std::memcpy(Tyboxes, _Tyboxes, 13 * 16 * 256 * sizeof(uint32_t));
+    std::memcpy(TboxesLast, _TboxesLast, 16 * 256);
+    std::memcpy(MBL, _MBL, 13 * 16 * 256 * sizeof(uint32_t));
   }
-}
 
-void aes_whitebox_decrypt_cfb(const uint8_t iv[16], const uint8_t* c,
-    size_t len, uint8_t* m) {
-  uint8_t cfb_blk[16];
-
-  for (int i = 0; i < 16; i++)
-    cfb_blk[i] = iv[i];
-
-  for (size_t i = 0; i < len; i++) {
-    if ((i & 0xf) == 0)
-      Cipher(cfb_blk);
-    m[i] = cfb_blk[i & 0xf] ^ c[i];
-    cfb_blk[i & 0xf] = c[i];
+  bool EncodeCBC(const uint8_t iv[16], const uint8_t *m, size_t len, uint8_t *c) {
+   return true;
   }
-}
 
-void aes_whitebox_encrypt_ofb(const uint8_t iv[16], const uint8_t* m,
-    size_t len, uint8_t* c) {
-  uint8_t cfb_blk[16];
-
-  for (int i = 0; i < 16; i++)
-    cfb_blk[i] = iv[i];
-
-  for (size_t i = 0; i < len; i++) {
-    if ((i & 0xf) == 0)
-      Cipher(cfb_blk);
-    c[i] = m[i] ^ cfb_blk[i & 0xf];
+  bool DecodeCBC(const uint8_t iv[16], const uint8_t *c, size_t len, uint8_t *m) {
+    return true;
   }
+
+};
+
+AES::AES(int Nr,
+         const uint8_t Xor[13][96][16][16],
+         const uint32_t Tyboxes[13][16][256],
+         const uint8_t TboxesLast[16][256],
+         const uint32_t MBL[13][16][256]) {
+  impl_ = new AESImpl(Nr, Xor, Tyboxes, TboxesLast, MBL);
 }
 
-void aes_whitebox_decrypt_ofb(const uint8_t iv[16], const uint8_t* c,
-    size_t len, uint8_t* m) {
-  aes_whitebox_encrypt_ofb(iv, c, len, m);
+AES::~AES() {
+  delete impl_;
 }
 
-void aes_whitebox_encrypt_ctr(const uint8_t nonce[16], const uint8_t* m,
-    size_t len, uint8_t* c) {
-  uint8_t counter[16], buf[16];
-
-  for (int i = 0; i < 16; i++)
-    counter[i] = nonce[i];
-
-  for (size_t i = 0; i < len; i++) {
-    if ((i & 0xf) == 0) {
-      for (int j = 0; j < 16; j++)
-        buf[j] = counter[j];
-      Cipher(buf);
-      for (int j = 15; j >= 0; j--) {
-        counter[j]++;
-        if (counter[j])
-          break;
-      }
-    }
-    c[i] = m[i] ^ buf[i & 0xf];
-  }
+bool AES::EncodeCBC(const uint8_t iv[16], const uint8_t *m, size_t len, uint8_t *c) {
+  return impl_->EncodeCBC(iv, m, len, c);
 }
 
-void aes_whitebox_decrypt_ctr(const uint8_t nonce[16], const uint8_t* c,
-    size_t len, uint8_t* m) {
-  aes_whitebox_encrypt_ctr(nonce, c, len, m);
+bool AES::DecodeCBC(const uint8_t iv[16], const uint8_t *c, size_t len, uint8_t *m) {
+  return impl_->DecodeCBC(iv, c, len, m);
 }
-
-}  // extern "C"
