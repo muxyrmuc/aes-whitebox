@@ -8,10 +8,10 @@
 
 class AESImpl {
   int Nr;
-  uint8_t Xor[13][96][16][16];
-  uint32_t Tyboxes[13][16][256];
+  uint8_t Xor[9][96][16][16];
+  uint32_t Tyboxes[9][16][256];
   uint8_t TboxesLast[16][256];
-  uint32_t MBL[13][16][256];
+  uint32_t MBL[9][16][256];
 
 void ShiftRows(uint8_t state[16]) {
   constexpr int shifts[16] = {
@@ -112,32 +112,50 @@ void Cipher(uint8_t in[16]) {
 
 public:
   AESImpl(int _Nr,
-          const uint8_t _Xor[13][96][16][16],
-          const uint32_t _Tyboxes[13][16][256],
+          const uint8_t _Xor[9][96][16][16],
+          const uint32_t _Tyboxes[9][16][256],
           const uint8_t _TboxesLast[16][256],
-          const uint32_t _MBL[13][16][256])
+          const uint32_t _MBL[9][16][256])
   : Nr(_Nr) {
-    std::memcpy(Xor, _Xor, 13 * 96 * 16 * 16);
-    std::memcpy(Tyboxes, _Tyboxes, 13 * 16 * 256 * sizeof(uint32_t));
+    std::memcpy(Xor, _Xor, 9 * 96 * 16 * 16);
+    std::memcpy(Tyboxes, _Tyboxes, 9 * 16 * 256 * sizeof(uint32_t));
     std::memcpy(TboxesLast, _TboxesLast, 16 * 256);
-    std::memcpy(MBL, _MBL, 13 * 16 * 256 * sizeof(uint32_t));
+    std::memcpy(MBL, _MBL, 9 * 16 * 256 * sizeof(uint32_t));
   }
 
   bool EncodeCBC(const uint8_t iv[16], const uint8_t *m, size_t len, uint8_t *c) {
-   return true;
-  }
+    if (len % 16 != 0)
+      return false;
 
-  bool DecodeCBC(const uint8_t iv[16], const uint8_t *c, size_t len, uint8_t *m) {
+    uint8_t xor_blk[16];
+    for (int i = 0; i < 16; i++)
+      xor_blk[i] = iv[i];
+
+    for (size_t i = 0; i < len; i += 16) {
+      uint8_t* c_moved = c + i;
+      const uint8_t* m_moved = m + i;
+
+      for (int i = 0; i < 16; i++) {
+        c_moved[i] = m_moved[i] ^ xor_blk[i];
+      }
+
+      Cipher(c_moved);
+
+      for (int i = 0; i < 16; i++) {
+        xor_blk[i] = c_moved[i];
+      }
+    }
+
     return true;
   }
 
 };
 
 AES::AES(int Nr,
-         const uint8_t Xor[13][96][16][16],
-         const uint32_t Tyboxes[13][16][256],
+         const uint8_t Xor[9][96][16][16],
+         const uint32_t Tyboxes[9][16][256],
          const uint8_t TboxesLast[16][256],
-         const uint32_t MBL[13][16][256]) {
+         const uint32_t MBL[9][16][256]) {
   impl_ = new AESImpl(Nr, Xor, Tyboxes, TboxesLast, MBL);
 }
 
@@ -150,5 +168,5 @@ bool AES::EncodeCBC(const uint8_t iv[16], const uint8_t *m, size_t len, uint8_t 
 }
 
 bool AES::DecodeCBC(const uint8_t iv[16], const uint8_t *c, size_t len, uint8_t *m) {
-  return impl_->DecodeCBC(iv, c, len, m);
+  return impl_->EncodeCBC(iv, c, len, m);
 }

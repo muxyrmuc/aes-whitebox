@@ -15,10 +15,10 @@ class AES {
 
 public:
   AES(int Nr,
-      const uint8_t Xor[13][96][16][16],
-      const uint32_t Tyboxes[13][16][256],
+      const uint8_t Xor[9][96][16][16],
+      const uint32_t Tyboxes[9][16][256],
       const uint8_t TboxesLast[16][256],
-      const uint32_t MBL[13][16][256]);
+      const uint32_t MBL[9][16][256]);
   ~AES();
 
   bool EncodeCBC(const uint8_t iv[16], const uint8_t* m, size_t len, uint8_t* c);
